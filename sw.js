@@ -1,6 +1,6 @@
 // Sube VERSION cada vez que publiques cambios para que los teléfonos descarguen la versión nueva.
-const VERSION = 'sobrecarga-v1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
+const VERSION = 'sobrecarga-v2';
+const SHELL = ['./', './index.html', './fonts/fonts.css', './fonts/Barlow-400.woff2', './fonts/Barlow-500.woff2', './fonts/Barlow-600.woff2', './fonts/BarlowCondensed-600.woff2', './fonts/BarlowCondensed-700.woff2', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

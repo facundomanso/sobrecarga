@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.facundomanso.sobrecarga",
+  "appName": "Sobrecarga",
+  "webDir": "www",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

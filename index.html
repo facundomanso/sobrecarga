@@ -13,9 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Layout: one narrow column, phone-first; bottom tab bar; cards only for things you act on */
 :root {
@@ -230,6 +228,9 @@ const TYPES = { weight: 'Con peso', bw: 'Peso corporal', time: 'Tiempo (s)' };
 const SERIES = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
 
 let mode = 'local';
+// Dentro del APK (Capacitor) hay plugins nativos para compartir la copia y manejar el botón atrás.
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const plugin = name => NATIVE ? window.Capacitor.Plugins[name] : null;
 const TEMPLATE = {"exercises":{"aduct":{"inc":2.5,"name":"Aductores","type":"weight"},"cuad":{"inc":2.5,"name":"Extensión de cuádriceps","type":"weight"},"curl":{"inc":2.5,"name":"Curl de bíceps en polea","type":"weight"},"elevp":{"inc":2.5,"name":"Elevaciones de piernas","type":"bw"},"femoral":{"inc":2.5,"name":"Curl femoral","type":"weight"},"fpmaq":{"inc":2.5,"name":"Face pull en máquina","type":"weight"},"gemelos":{"inc":5,"name":"Gemelos en máquina","type":"weight"},"hack":{"inc":2.5,"name":"Sentadilla hack / multipower","type":"weight"},"hip":{"inc":5,"name":"Hip thrust","type":"weight"},"hiper":{"inc":2.5,"name":"Hiperextensiones a 45°","type":"weight"},"hombro":{"inc":2.5,"name":"Press de hombro en máquina","type":"weight"},"jalon":{"inc":2.5,"name":"Jalón al pecho","type":"weight"},"latmaq":{"inc":2.5,"name":"Elevaciones laterales en máquina","type":"weight"},"pecdeck":{"inc":5,"name":"Pec deck / aperturas en polea","type":"weight"},"pecho":{"inc":2.5,"name":"Press de pecho en máquina","type":"weight"},"plancha":{"inc":2.5,"name":"Plancha sobre antebrazos","type":"time"},"prensa":{"inc":5,"name":"Prensa a una pierna","type":"weight"},"pullover":{"inc":2.5,"name":"Pullover en polea","type":"weight"},"remo":{"inc":2.5,"name":"Remo sentado","type":"weight"},"tricmaq":{"inc":2.5,"name":"Extensión de tríceps (máquina vertical)","type":"weight"},"bulgara":{"name":"Sentadilla búlgara","type":"weight","inc":2.5}},"routines":[{"id":"push","items":[{"ex":"pecho","max":12,"min":10,"sets":4},{"ex":"pecdeck","max":15,"min":12,"sets":4},{"ex":"hombro","max":12,"min":10,"sets":3},{"ex":"latmaq","max":15,"min":12,"sets":3},{"ex":"tricmaq","max":15,"min":12,"sets":3},{"ex":"plancha","max":45,"min":30,"sets":3}],"name":"Empuje"},{"id":"pull","items":[{"ex":"jalon","max":12,"min":10,"sets":3},{"ex":"remo","max":12,"min":10,"sets":3},{"ex":"fpmaq","max":15,"min":15,"sets":3},{"ex":"pullover","max":12,"min":12,"sets":3},{"ex":"curl","max":12,"min":12,"sets":3},{"ex":"elevp","max":15,"min":10,"sets":3}],"name":"Tirón"},{"id":"legs","items":[{"ex":"hack","max":10,"min":8,"sets":4},{"ex":"hiper","max":15,"min":12,"sets":3},{"ex":"prensa","max":10,"min":10,"sets":3,"alts":["bulgara"]},{"ex":"hip","max":12,"min":10,"sets":3},{"ex":"femoral","max":12,"min":10,"sets":3},{"ex":"cuad","max":15,"min":12,"sets":3},{"ex":"aduct","max":12,"min":12,"sets":3},{"ex":"gemelos","max":15,"min":12,"sets":4}],"name":"Pierna"}]};
 let plan = null, sessions = [];
 const loaded = { plan: false, sessions: false };
@@ -781,13 +782,17 @@ document.addEventListener('click', async ev => {
     case 'tplplan': try { await writePlan(clone(TEMPLATE)); render(true); toast('Rutinas cargadas. Puedes cambiarlas en Rutinas.'); } catch (e) { toast(errMsg(e)); } break;
     case 'initplan': try { await writePlan({ exercises: {}, routines: [{ id: uid('rutina'), name: 'Rutina 1', items: [] }] }); S.tab = 'plan'; render(true); } catch (e) { toast(errMsg(e)); } break;
     case 'export': {
-      const blob = new Blob([JSON.stringify({ plan, sessions }, null, 2)], { type: 'application/json' }), name = 'sobrecarga-' + today() + '.json';
-      const file = new File([blob], name, { type: 'application/json' });
+      const json = JSON.stringify({ plan, sessions }, null, 2), name = 'sobrecarga-' + today() + '.json';
+      const blob = new Blob([json], { type: 'application/json' }), file = new File([blob], name, { type: 'application/json' });
       try {
-        if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Copia de Sobrecarga' });
+        if (NATIVE) {
+          await plugin('Filesystem').writeFile({ path: 'Sobrecarga/' + name, data: json, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
+          lsSet('sobrecarga-backup', Date.now()); render(true); toast('Copia guardada en Documentos/Sobrecarga');
+          break;
+        } else if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Copia de Sobrecarga' });
         else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
         lsSet('sobrecarga-backup', Date.now()); render(true); toast('Copia lista');
-      } catch (e) { if (e?.name !== 'AbortError') toast('No se pudo crear la copia.'); }
+      } catch (e) { if (e?.name !== 'AbortError' && !/cancel/i.test(e?.message || '')) toast('No se pudo crear la copia.'); }
       break;
     }
   }
@@ -836,7 +841,12 @@ if (S.workout) S.tab = 'train';
 { const l = lsGet('sobrecarga-data'); plan = l?.plan || null; sessions = l?.sessions || []; }
 render(true);
 navigator.storage?.persist?.().catch(() => {});
-if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+if (NATIVE) plugin('App').addListener('backButton', () => {
+  if (S.tab === 'plan' && S.planR != null) { S.planR = null; render(true); }
+  else if (S.tab !== 'home' && !(S.tab === 'train' && S.workout)) { S.tab = 'home'; render(true); scrollTo(0, 0); }
+  else plugin('App').minimizeApp();
+});
+else if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 let installEvt = null;
 addEventListener('beforeinstallprompt', ev => { ev.preventDefault(); installEvt = ev; $('#install').hidden = false; });
 $('#install').addEventListener('click', async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; $('#install').hidden = true; });
