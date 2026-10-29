@@ -1,4 +1,4 @@
-# Sobrecarga
+# Gymple
 
 App para apuntar tus entrenos de gimnasio y aplicar sobrecarga progresiva (doble progresión): te sugiere cuándo subir peso o sumar repeticiones, con gráficas de progreso por ejercicio.
 

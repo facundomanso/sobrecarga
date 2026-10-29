@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sobrecarga</title>
+<title>Gymple</title>
 <meta name="description" content="Apunta tus series, mira tu progreso y recibe la sugerencia de sobrecarga para la próxima sesión.">
 <meta name="theme-color" content="#1d5bd0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Sobrecarga">
+<meta name="apple-mobile-web-app-title" content="Gymple">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -57,7 +57,8 @@ section { display: flex; flex-direction: column; gap: 12px; }
 .small { font-size: 13px; }
 .num { font-variant-numeric: tabular-nums; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.banner { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.banner { background: var(--warn-soft); color: var(--ink); border-radius: 8px; padding: 10px 6px 10px 12px; font-size: 13px; display: flex; gap: 6px; align-items: flex-start; }
+.banner .close { min-height: 32px; padding: 4px 8px; color: var(--ink-2); flex: none; }
 button, .btn { font: 600 14px/1 var(--body); border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 14px; cursor: pointer; min-height: 40px; }
 button:hover { border-color: var(--muted); }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
@@ -208,7 +209,7 @@ td.r, th.r { text-align: right; }
 </head>
 <body>
 <div class="wrap" id="app">
-  <header class="top"><div class="brand">Sobre<span>carga</span></div><div class="row"><button class="ghost small" id="install" hidden>Instalar app</button><div class="sync" id="sync">Cargando…</div></div></header>
+  <header class="top"><div class="brand">Gym<span>ple</span></div><div class="row"><button class="ghost small" id="install" hidden>Instalar app</button><div class="sync" id="sync">Cargando…</div></div></header>
   <main id="main"><div class="empty">Cargando tus entrenos…</div></main>
 </div>
 <nav class="tabs" aria-label="Secciones"><div class="in" id="tabs"></div></nav>
@@ -663,7 +664,7 @@ function viewPlan() {
     <div class="row"><button data-act="export">Descargar copia</button><label class="btn" for="imp">Restaurar desde archivo</label><input type="file" id="imp" accept="application/json,.json" hidden></div></section>`;
 }
 function emptyStore() {
-  return `<div class="empty" style="display:flex;flex-direction:column;gap:12px;align-items:center"><h2>Bienvenido a Sobrecarga</h2>
+  return `<div class="empty" style="display:flex;flex-direction:column;gap:12px;align-items:center"><h2>Bienvenido a Gymple</h2>
     <p style="margin:0;max-width:40ch">Apunta tus series y la app te dice cuándo subir peso. Empieza con una rutina lista o crea la tuya.</p>
     <button class="primary" data-act="tplplan">Usar rutina Empuje / Tirón / Pierna</button>
     <button data-act="initplan">Empezar con una rutina vacía</button>
@@ -678,7 +679,8 @@ function render(force) {
   $('#sync').textContent = 'Guardado en este dispositivo';
   charts = {}; chartSeq = 0;
   const lastBk = lsGet('sobrecarga-backup'), daysBk = lastBk ? (Date.now() - lastBk) / 864e5 : Infinity;
-  const banner = S.tab === 'home' && sessions.length >= 5 && daysBk > 21 ? `<div class="banner">Tus datos viven solo en este teléfono. Haz una copia de seguridad de vez en cuando para no perderlos si cambias de móvil. <button class="ghost" data-act="export" style="padding:4px 0;min-height:0;color:var(--accent)">Descargar copia</button></div>` : '';
+  const hid = lsGet('sobrecarga-backup-hide'), daysHid = hid ? (Date.now() - hid) / 864e5 : Infinity;
+  const banner = S.tab === 'home' && sessions.length >= 5 && daysBk > 21 && daysHid > 30 ? `<div class="banner"><div>Tus datos viven solo en este teléfono. Haz una copia de seguridad de vez en cuando para no perderlos si cambias de móvil. <button class="ghost" data-act="export" style="padding:4px 0;min-height:0;color:var(--accent)">Descargar copia</button></div><button class="ghost close" data-act="hidebk" aria-label="Cerrar aviso">✕</button></div>` : '';
   const v = { home: viewHome, train: viewTrain, progress: viewProgress, history: viewHistory, plan: viewPlan }[S.tab];
   main.innerHTML = `<div style="display:flex;flex-direction:column;gap:16px">${banner}${v()}</div>`;
   main.dataset.tab = S.tab;
@@ -754,6 +756,7 @@ document.addEventListener('click', async ev => {
       catch (e) { b.disabled = false; toast(errMsg(e)); }
       break;
     }
+    case 'hidebk': lsSet('sobrecarga-backup-hide', Date.now()); render(true); toast('Aviso oculto por 30 días'); break;
     case 'askdel': S.confirm = d.id; render(true); break;
     case 'nodel': S.confirm = null; render(true); break;
     case 'del': try { await removeSession(d.id); S.confirm = null; render(true); toast('Entreno borrado'); } catch (e) { toast(errMsg(e)); } break;
@@ -782,14 +785,14 @@ document.addEventListener('click', async ev => {
     case 'tplplan': try { await writePlan(clone(TEMPLATE)); render(true); toast('Rutinas cargadas. Puedes cambiarlas en Rutinas.'); } catch (e) { toast(errMsg(e)); } break;
     case 'initplan': try { await writePlan({ exercises: {}, routines: [{ id: uid('rutina'), name: 'Rutina 1', items: [] }] }); S.tab = 'plan'; render(true); } catch (e) { toast(errMsg(e)); } break;
     case 'export': {
-      const json = JSON.stringify({ plan, sessions }, null, 2), name = 'sobrecarga-' + today() + '.json';
+      const json = JSON.stringify({ plan, sessions }, null, 2), name = 'gymple-' + today() + '.json';
       const blob = new Blob([json], { type: 'application/json' }), file = new File([blob], name, { type: 'application/json' });
       try {
         if (NATIVE) {
-          await plugin('Filesystem').writeFile({ path: 'Sobrecarga/' + name, data: json, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
-          lsSet('sobrecarga-backup', Date.now()); render(true); toast('Copia guardada en Documentos/Sobrecarga');
+          await plugin('Filesystem').writeFile({ path: 'Gymple/' + name, data: json, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true });
+          lsSet('sobrecarga-backup', Date.now()); render(true); toast('Copia guardada en Documentos/Gymple');
           break;
-        } else if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Copia de Sobrecarga' });
+        } else if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: 'Copia de Gymple' });
         else { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
         lsSet('sobrecarga-backup', Date.now()); render(true); toast('Copia lista');
       } catch (e) { if (e?.name !== 'AbortError' && !/cancel/i.test(e?.message || '')) toast('No se pudo crear la copia.'); }
@@ -831,7 +834,7 @@ document.addEventListener('change', async ev => {
     await writePlan(data.plan);
     for (const s of data.sessions) await writeSession(s);
     S.planDraft = null; render(true); toast(`Restaurados ${data.sessions.length} entrenos`);
-  } catch (e) { toast(e?.message === 'formato' ? 'El archivo no es una copia de Sobrecarga.' : errMsg(e)); }
+  } catch (e) { toast(e?.message === 'formato' ? 'El archivo no es una copia de Gymple.' : errMsg(e)); }
   t.value = '';
 });
 
