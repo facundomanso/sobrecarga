@@ -319,12 +319,19 @@ function trend(id) {
   if (d > 0.01) return { k: 'up', cls: 'good', ic: '▲', label: 'Subiendo' };
   return { k: 'flat', cls: '', ic: '●', label: 'Estable' };
 }
+// La que toca es la rutina que hace más tiempo que no haces; las que nunca hiciste van primero.
+// A igualdad de fecha, gana la que está antes en la lista de rutinas.
+function lastDone(rid) { let d = null; for (const s of sessions) if (s.routine === rid && (!d || s.date > d)) d = s.date; return d; }
 function nextRoutine() {
   const rs = plan?.routines || []; if (!rs.length) return null;
-  const ss = sortedSessions(); const last = ss[ss.length - 1];
-  if (!last) return rs[0];
-  const i = rs.findIndex(r => r.id === last.routine);
-  return rs[(i + 1) % rs.length] || rs[0];
+  let best = rs[0], bestD = lastDone(rs[0].id);
+  for (const r of rs.slice(1)) { const d = lastDone(r.id); if (bestD && (!d || d < bestD)) { best = r; bestD = d; } }
+  return best;
+}
+function agoText(d) {
+  if (!d) return 'Todavía no la hiciste';
+  const n = Math.round((toMs(today()) - toMs(d)) / 864e5);
+  return n <= 0 ? 'La hiciste hoy' : n === 1 ? 'Última vez ayer' : `Última vez hace ${n} días`;
 }
 function sessionVol(s) { return (s.entries || []).reduce((a, e) => a + entryStats(e.sets || []).vol, 0); }
 function prsSince(fromDate) {
@@ -453,7 +460,7 @@ function viewHome() {
   }).join('') }));
   const dVol = volPrev ? Math.round((volWk - volPrev) / volPrev * 100) : null;
   return `
-  ${nr ? `<div class="next"><div><div class="k">Hoy toca</div><div class="v">${esc(nr.name)}</div><div class="small" style="opacity:.85">${nr.items.length} ejercicios</div></div><button data-act="start" data-r="${esc(nr.id)}">Empezar</button></div>` : ''}
+  ${nr ? `<div class="next"><div><div class="k">Hoy toca</div><div class="v">${esc(nr.name)}</div><div class="small" style="opacity:.85">${agoText(lastDone(nr.id))} · ${nr.items.length} ejercicios</div></div><button data-act="start" data-r="${esc(nr.id)}">Empezar</button></div>` : ''}
   <div class="tiles">
     <div class="tile"><span class="lab">Esta semana</span><span class="val">${nWk}</span><span class="sub">${nWk === 1 ? 'entreno' : 'entrenos'} · ${ss.length} en total</span></div>
     <div class="tile"><span class="lab">Récords</span><span class="val">${prs.length}</span><span class="sub">últimos 14 días</span></div>
