@@ -333,6 +333,17 @@ function agoText(d) {
   const n = Math.round((toMs(today()) - toMs(d)) / 864e5);
   return n <= 0 ? 'La hiciste hoy' : n === 1 ? 'Última vez ayer' : `Última vez hace ${n} días`;
 }
+// Racha semanal: semanas seguidas (lunes a domingo) con al menos un entreno.
+// La semana en curso no corta la racha si todavía no entrenaste.
+function weekStreaks() {
+  const ws = [...new Set(sessions.map(s => weekOf(s.date)))].sort(), has = new Set(ws);
+  let best = 0, run = 0, prev = null;
+  for (const w of ws) { run = prev && toMs(w) - toMs(prev) === 7 * 864e5 ? run + 1 : 1; best = Math.max(best, run); prev = w; }
+  const wk = weekOf(today()), step = d => new Date(toMs(d) - 7 * 864e5).toISOString().slice(0, 10);
+  let w = has.has(wk) ? wk : step(wk), cur = 0;
+  while (has.has(w)) { cur++; w = step(w); }
+  return { cur, best };
+}
 function sessionVol(s) { return (s.entries || []).reduce((a, e) => a + entryStats(e.sets || []).vol, 0); }
 function prsSince(fromDate) {
   const out = [];
@@ -448,6 +459,7 @@ function viewHome() {
   const wk = weekOf(today()), prevWk = new Date(toMs(wk) - 7 * 864e5).toISOString().slice(0, 10);
   const volWk = ss.filter(s => weekOf(s.date) === wk).reduce((a, s) => a + sessionVol(s), 0);
   const volPrev = ss.filter(s => weekOf(s.date) === prevWk).reduce((a, s) => a + sessionVol(s), 0);
+  const st = weekStreaks();
   const prs = prsSince(new Date(toMs(today()) - 14 * 864e5).toISOString().slice(0, 10));
   const nWk = ss.filter(s => weekOf(s.date) === wk).length;
   const weeks = [...new Set(ss.map(s => weekOf(s.date)))].sort();
@@ -463,7 +475,7 @@ function viewHome() {
   ${nr ? `<div class="next"><div><div class="k">Hoy toca</div><div class="v">${esc(nr.name)}</div><div class="small" style="opacity:.85">${agoText(lastDone(nr.id))} · ${nr.items.length} ejercicios</div></div><button data-act="start" data-r="${esc(nr.id)}">Empezar</button></div>` : ''}
   <div class="tiles">
     <div class="tile"><span class="lab">Esta semana</span><span class="val">${nWk}</span><span class="sub">${ss.length} ${ss.length === 1 ? 'entreno' : 'entrenos'} en total</span></div>
-    <div class="tile"><span class="lab">Récords</span><span class="val">${prs.length}</span><span class="sub">últimos 14 días</span></div>
+    <div class="tile"><span class="lab">Racha</span><span class="val">${st.cur}<small style="font-size:16px"> ${st.cur === 1 ? 'semana' : 'semanas'}</small></span><span class="sub">${st.cur > 0 && st.cur >= st.best ? '¡Tu mejor racha!' : `Mejor: ${st.best} ${st.best === 1 ? 'semana' : 'semanas'}`}</span></div>
     <div class="tile"><span class="lab">Volumen semana</span><span class="val">${volWk >= 10000 ? fkg(volWk / 1000) + '<small style="font-size:16px"> t</small>' : fint(volWk)}</span><span class="sub">${dVol == null ? 'kg × reps' : (dVol >= 0 ? '▲ +' : '▼ ') + dVol + ' % vs anterior'}</span></div>
   </div>
   ${ready.length ? `<section class="card"><h3>Listos para subir peso</h3><div class="list">${ready.map(({ it, sg }) => `<button class="li" data-act="goex" data-ex="${esc(it.ex)}"><span class="n">${esc(exName(it.ex))}</span><span class="chip good">↑ ${fkg(sg.W)} kg</span><span class="d">${esc(sg.text)}</span></button>`).join('')}</div></section>` : ''}
