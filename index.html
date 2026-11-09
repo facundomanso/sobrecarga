@@ -111,20 +111,6 @@ nav.tabs button[aria-current="page"] { color: var(--accent); background: var(--a
 .picker button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .picker .grp { align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 2px 0 8px; white-space: nowrap; }
 
-/* rest timer */
-.restbar { position: fixed; left: 0; right: 0; top: 0; z-index: 15; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; background: var(--ink); color: var(--bg); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-.restbar.done { background: var(--good); color: var(--surface); }
-.restbar .rt { display: flex; flex-direction: column; min-width: 0; }
-.restbar .rl { font-size: 12px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.restbar .rc { font: 700 34px/1 var(--display); }
-.restbar.done .rc { font-size: 24px; }
-.restbar .rb { display: flex; gap: 6px; }
-.restbar button { background: transparent; color: inherit; border-color: currentColor; min-height: 38px; padding: 8px 10px; }
-.restcfg { display: flex; flex-direction: column; gap: 8px; background: var(--surface-2); border-radius: 8px; padding: 10px; }
-.sw-row { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
-.sw-row input { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
-.sw-row > span { display: flex; flex-direction: column; gap: 2px; }
-
 /* stopwatch */
 button.swbtn { padding: 4px 8px; min-height: 0; font-size: 13px; color: var(--accent); border: 1px solid var(--line); border-radius: 999px; }
 .savebar { flex-wrap: wrap; }
@@ -250,7 +236,6 @@ td.r, th.r { text-align: right; }
   <main id="main"><div class="empty">Cargando tus entrenos…</div></main>
 </div>
 <nav class="tabs" aria-label="Secciones"><div class="in" id="tabs"></div></nav>
-<div id="restbar" class="restbar" role="timer" aria-live="polite" hidden></div>
 <div id="toast" class="toast" hidden></div>
 
 <script>
@@ -358,49 +343,14 @@ function trend(id) {
   if (d > 0.01) return { k: 'up', cls: 'good', ic: '▲', label: 'Subiendo' };
   return { k: 'flat', cls: '', ic: '●', label: 'Estable' };
 }
-/* ---------- rest timer ---------- */
-const REST_OPTS = [30, 45, 60, 75, 90, 120, 150, 180, 240, 300];
+/* ---------- stopwatch ---------- */
 const fmtSecs = n => Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
-const restOn = r => !!r?.rest?.on;
 const elapsedText = t => { const m = Math.max(0, Math.floor((Date.now() - t) / 60000)); return m < 60 ? `Llevas ${m} min` : `Llevas ${Math.floor(m / 60)} h ${m % 60} min`; };
-let audioCtx = null, wakeLock = null;
-function beep() {
-  try {
-    audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.25, 0.5].forEach(t => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.25, audioCtx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + t + 0.2); o.connect(g).connect(audioCtx.destination); o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.2); });
-  } catch {}
-}
-function startRest(secs, label) {
-  if (!S.workout) return;
-  S.workout.rest = { end: Date.now() + secs * 1000, label, alerted: false };
-  try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume?.(); } catch {}  // se desbloquea con el toque
-  saveDraft(); tickRest();
-}
-function tickRest() {
-  const bar = $('#restbar'), w = S.workout, r = w?.rest;
-  const el = $('#elapsed'); if (el && w?.startedAt) el.textContent = elapsedText(w.startedAt);
-  if (!r || S.tab !== 'train') { bar.hidden = true; return; }
-  const left = Math.ceil((r.end - Date.now()) / 1000);
-  if (left <= 0 && !r.alerted) {
-    r.alerted = true; saveDraft();
-    if (Date.now() - r.end < 10000) { navigator.vibrate?.([300, 150, 300, 150, 300]); beep(); }
-  }
-  if (left <= -8) { w.rest = null; saveDraft(); bar.hidden = true; return; }
-  bar.hidden = false;
-  const mode = (left > 0 ? 'run:' : 'done:') + r.label;
-  if (bar.dataset.mode !== mode) {  // rebuild only on state change so taps on the buttons are never lost
-    bar.dataset.mode = mode;
-    bar.classList.toggle('done', left <= 0);
-    bar.innerHTML = left > 0
-      ? `<div class="rt"><span class="rl">Descanso · ${esc(r.label)}</span><span class="rc num"></span></div><div class="rb"><button data-act="restadj" data-v="-15">−15 s</button><button data-act="restadj" data-v="15">+15 s</button><button data-act="restskip">Saltar</button></div>`
-      : `<div class="rt"><span class="rl">${esc(r.label)}</span><span class="rc">¡A la siguiente serie!</span></div><div class="rb"><button data-act="restskip">Cerrar</button></div>`;
-  }
-  if (left > 0) bar.querySelector('.rc').textContent = fmtSecs(left);
-}
-/* stopwatch inside Entrenar */
+let wakeLock = null;
 const swMs = sw => sw.acc + (sw.run ? Date.now() - sw.run : 0);
 function tickSw() {
-  const el = $('#swpanel'), sw = S.workout?.sw;
+  const w = S.workout, sw = w?.sw, el = $('#swpanel'), et = $('#elapsed');
+  if (et && w?.startedAt) et.textContent = elapsedText(w.startedAt);
   if (!el) return;
   if (!sw) { el.hidden = true; el.dataset.built = ''; return; }
   if (!el.dataset.built) {
@@ -414,15 +364,14 @@ function tickSw() {
   if (go.textContent !== ic) { go.textContent = ic; go.setAttribute('aria-label', sw.run ? 'Pausar' : 'Iniciar'); go.classList.toggle('on', !!sw.run); }
 }
 setInterval(tickSw, 100);
-setInterval(tickRest, 500);
 async function syncWakeLock() {
-  const want = S.tab === 'train' && S.workout && !S.workout.id && restOn(plan?.routines.find(r => r.id === S.workout.routine)) && document.visibilityState === 'visible';
+  const want = S.tab === 'train' && !!S.workout?.sw?.run && document.visibilityState === 'visible';  // pantalla encendida mientras corre el cronómetro
   try {
     if (want && !wakeLock) { wakeLock = await navigator.wakeLock?.request('screen'); wakeLock?.addEventListener('release', () => { wakeLock = null; }); }
     else if (!want && wakeLock) { await wakeLock.release(); wakeLock = null; }
   } catch { wakeLock = null; }
 }
-document.addEventListener('visibilitychange', () => { syncWakeLock(); tickRest(); });
+document.addEventListener('visibilitychange', () => { syncWakeLock(); tickSw(); });
 
 // La que toca es la rutina que hace más tiempo que no haces; las que nunca hiciste van primero.
 // A igualdad de fecha, gana la que está antes en la lista de rutinas.
@@ -758,7 +707,7 @@ function viewTrain() {
     }).join('');
   }
   const r = plan.routines.find(x => x.id === w.routine);
-  return `<div class="row between"><div><h2>${esc(r?.name || 'Entreno')}${w.id ? ' · editando' : ''}</h2>${w.startedAt && !w.id ? `<div class="row" style="gap:10px"><span class="small muted num" id="elapsed">${elapsedText(w.startedAt)}</span><button class="ghost swbtn" data-act="swopen">⏱ Cronómetro</button></div>` : ''}${restOn(r) && !w.id ? `<div class="small muted">Descanso automático: ${fmtSecs(r.rest.secs)}</div>` : ''}</div><label class="fld">Fecha<input type="date" id="w-date" data-w="date" value="${esc(w.date)}"></label></div>
+  return `<div class="row between"><div><h2>${esc(r?.name || 'Entreno')}${w.id ? ' · editando' : ''}</h2>${w.startedAt && !w.id ? `<div class="row" style="gap:10px"><span class="small muted num" id="elapsed">${elapsedText(w.startedAt)}</span><button class="ghost swbtn" data-act="swopen">⏱ Cronómetro</button></div>` : ''}</div><label class="fld">Fecha<input type="date" id="w-date" data-w="date" value="${esc(w.date)}"></label></div>
     ${w.id ? '' : '<div class="small muted">Los números grises son lo que te toca hoy. Pulsa ✓ para apuntar la serie tal cual, o escribe lo que hiciste. Si dejas el peso vacío se usa el sugerido.</div>'}
     ${w.entries.map((e, ei) => {
       const it = itemFor(e.slot || e.ex), type = exType(e.ex), h = exHistory(e.ex).filter(x => x.sid !== w.id), last = h[h.length - 1], sg = w.id ? null : suggest(e.ex);
@@ -785,10 +734,7 @@ function viewPlan() {
   const dirty = JSON.stringify(p) !== JSON.stringify(plan);
   const card = (r, ri) => `<section class="card">
     <div class="ed" style="border:0;padding-top:0"><label class="fld">Nombre de la rutina<input id="p-rn-${ri}" data-p="rname" data-r="${ri}" value="${esc(r.name)}"></label>
-      <div class="restcfg">
-        <label class="sw-row" for="p-ro-${ri}"><input type="checkbox" id="p-ro-${ri}" data-p="resto" data-r="${ri}" ${restOn(r) ? 'checked' : ''}><span><b>Temporizador de descanso</b><span class="small muted">Arranca solo al marcar cada serie con ✓ y mantiene la pantalla encendida.</span></span></label>
-        ${restOn(r) ? `<label class="fld">Descanso por defecto<select id="p-rs-${ri}" data-p="rests" data-r="${ri}">${REST_OPTS.map(n => `<option value="${n}" ${(r.rest.secs || 90) === n ? 'selected' : ''}>${fmtSecs(n)}</option>`).join('')}</select></label>` : ''}
-      </div></div>
+    </div>
     ${r.items.map((it, ii) => { const ex = p.exercises[it.ex] || {}; return `<div class="ed">
       <div class="nmrow"><input id="p-n-${ri}-${ii}" aria-label="Nombre del ejercicio" data-p="name" data-r="${ri}" data-i="${ii}" value="${esc(ex.name)}">
         <button class="ghost" data-act="mv" data-r="${ri}" data-i="${ii}" data-d="-1" aria-label="Subir" ${ii === 0 ? 'disabled' : ''}>↑</button>
@@ -800,7 +746,6 @@ function viewPlan() {
         <label class="fld">Reps máx<input id="p-ma-${ri}-${ii}" inputmode="numeric" data-p="max" data-r="${ri}" data-i="${ii}" value="${it.max}"></label>
         <label class="fld">Salto kg<input id="p-inc-${ri}-${ii}" inputmode="decimal" data-p="inc" data-r="${ri}" data-i="${ii}" value="${fkg(ex.inc || 2.5)}" ${ex.type !== 'weight' ? 'disabled' : ''}></label>
       </div>
-      ${restOn(r) ? `<label class="fld">Descanso<select id="p-ir-${ri}-${ii}" data-p="irest" data-r="${ri}" data-i="${ii}"><option value="">Por defecto (${fmtSecs(r.rest.secs || 90)})</option>${REST_OPTS.map(n => `<option value="${n}" ${it.rest === n ? 'selected' : ''}>${fmtSecs(n)}</option>`).join('')}</select></label>` : ''}
       <select id="p-t-${ri}-${ii}" aria-label="Tipo" data-p="type" data-r="${ri}" data-i="${ii}">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${ex.type === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       <div class="alts">
         ${(it.alts || []).map((a, k) => `<div class="nmrow"><span class="arrow" aria-hidden="true">↳</span><input id="p-a-${ri}-${ii}-${k}" aria-label="Nombre de la variante" data-p="altname" data-r="${ri}" data-i="${ii}" data-k="${k}" value="${esc(p.exercises[a]?.name)}"><button class="ghost danger" data-act="paltrm" data-r="${ri}" data-i="${ii}" data-k="${k}" aria-label="Quitar variante">✕</button></div>`).join('')}
@@ -854,7 +799,7 @@ function render(force) {
   const v = { home: viewHome, train: viewTrain, progress: viewProgress, history: viewHistory, plan: viewPlan }[S.tab];
   main.innerHTML = `<div style="display:flex;flex-direction:column;gap:16px">${banner}${v()}</div>`;
   main.dataset.tab = S.tab;
-  drawCharts(); tickRest(); tickSw(); syncWakeLock();
+  drawCharts(); tickSw(); syncWakeLock();
 }
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawCharts, 150); });
 
@@ -881,17 +826,13 @@ document.addEventListener('click', async ev => {
     case 'done': {
       const e = W.entries[+d.e], s = e.sets[+d.s], inp = k => $(`#w-${d.e}-${d.s}-${k}`);
       if (!s.done) { if (s.r === '' && inp('r')?.placeholder) s.r = inp('r').placeholder; if (s.kg === '' && inp('kg') && /\d/.test(inp('kg').placeholder)) s.kg = inp('kg').placeholder; }
-      s.done = !s.done; saveDraft(); render(true);
-      const it = itemFor(e.slot || e.ex), rt = it?.routine;
-      if (s.done && !W.id && restOn(rt)) startRest(it.rest || rt.rest.secs || 90, exName(e.ex));
-      break;
+      s.done = !s.done; saveDraft(); render(true); break;
     }
-    case 'restadj': if (W?.rest) { W.rest.end = Math.max(Date.now() + 1000, W.rest.end + +d.v * 1000); W.rest.alerted = false; saveDraft(); tickRest(); } break;
     case 'swopen': if (W) { W.sw ||= { acc: 0, run: null }; saveDraft(); tickSw(); } break;
-    case 'swtoggle': if (W?.sw) { const sw = W.sw; if (sw.run) { sw.acc += Date.now() - sw.run; sw.run = null; } else sw.run = Date.now(); saveDraft(); tickSw(); } break;
-    case 'swreset': if (W?.sw) { W.sw = { acc: 0, run: null }; saveDraft(); tickSw(); } break;
-    case 'swclose': if (W) { W.sw = null; saveDraft(); tickSw(); } break;
-    case 'restskip': if (W) { W.rest = null; saveDraft(); tickRest(); } break;
+    case 'swtoggle': if (W?.sw) { const sw = W.sw; if (sw.run) { sw.acc += Date.now() - sw.run; sw.run = null; } else sw.run = Date.now(); saveDraft(); tickSw(); syncWakeLock(); } break;
+    case 'swreset': if (W?.sw) { W.sw = { acc: 0, run: null }; saveDraft(); tickSw(); syncWakeLock(); } break;
+    case 'swclose': if (W) { W.sw = null; saveDraft(); tickSw(); syncWakeLock(); } break;
+
     case 'addset': { const e = W.entries[+d.e]; const l = e.sets[e.sets.length - 1] || {}; e.sets.push({ kg: l.kg ?? '', r: '', done: false }); saveDraft(); render(true); break; }
     case 'rmset': W.entries[+d.e].sets.pop(); saveDraft(); render(true); break;
     case 'variant': { const e = W.entries[+d.e]; if (e.ex === d.ex) break; e.slot = e.slot || e.ex; e.ex = d.ex; e.sets = e.sets.map(() => ({ kg: '', r: '', done: false })); saveDraft(); render(true); break; }
@@ -1002,9 +943,6 @@ document.addEventListener('input', ev => {
     else if (d.p === 'sets' || d.p === 'min' || d.p === 'max') it[d.p] = Math.round(num(t.value) ?? 0);
     else if (d.p === 'inc') p.exercises[it.ex].inc = num(t.value) || 2.5;
     else if (d.p === 'type') { p.exercises[it.ex].type = t.value; render(true); return; }
-    else if (d.p === 'resto') { r.rest = { ...(r.rest || { secs: 90 }), on: t.checked }; render(true); return; }
-    else if (d.p === 'rests') r.rest.secs = +t.value;
-    else if (d.p === 'irest') { if (t.value) it.rest = +t.value; else delete it.rest; }
     else return;
     const dirty = JSON.stringify(p) !== JSON.stringify(plan);
     document.querySelectorAll('[data-act="savep"],[data-act="resetp"]').forEach(x => x.disabled = !dirty);
@@ -1012,7 +950,7 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', async ev => {
   const t = ev.target;
-  if (['type', 'resto', 'rests', 'irest'].includes(t.dataset.p)) return; // handled on input
+  if (t.dataset.p === 'type') return; // handled on input
   if (t.id === 'prog-ex') { S.ex = t.value; render(true); return; }
   if (t.id !== 'imp' || !t.files?.[0]) return;
   try {
