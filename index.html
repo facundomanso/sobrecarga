@@ -125,6 +125,17 @@ nav.tabs button[aria-current="page"] { color: var(--accent); background: var(--a
 .sw-row input { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
 .sw-row > span { display: flex; flex-direction: column; gap: 2px; }
 
+/* stopwatch */
+button.swbtn { padding: 4px 8px; min-height: 0; font-size: 13px; color: var(--accent); border: 1px solid var(--line); border-radius: 999px; }
+.savebar { flex-wrap: wrap; }
+.savebar .swpanel button { flex: none; }
+.swpanel { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.swpanel .swt { font: 700 30px/1 var(--display); margin-right: auto; }
+.swpanel .swt small { font-size: 18px; color: var(--muted); }
+.swpanel button { width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; font-size: 18px; display: grid; place-items: center; }
+.swpanel .swgo { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.swpanel .swgo.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
 /* calendar */
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
 .cal .wd { text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .06em; padding-bottom: 2px; }
@@ -376,11 +387,33 @@ function tickRest() {
   }
   if (left <= -8) { w.rest = null; saveDraft(); bar.hidden = true; return; }
   bar.hidden = false;
-  bar.classList.toggle('done', left <= 0);
-  bar.innerHTML = left > 0
-    ? `<div class="rt"><span class="rl">Descanso · ${esc(r.label)}</span><span class="rc num">${fmtSecs(left)}</span></div><div class="rb"><button data-act="restadj" data-v="-15">−15 s</button><button data-act="restadj" data-v="15">+15 s</button><button data-act="restskip">Saltar</button></div>`
-    : `<div class="rt"><span class="rl">${esc(r.label)}</span><span class="rc">¡A la siguiente serie!</span></div><div class="rb"><button data-act="restskip">Cerrar</button></div>`;
+  const mode = (left > 0 ? 'run:' : 'done:') + r.label;
+  if (bar.dataset.mode !== mode) {  // rebuild only on state change so taps on the buttons are never lost
+    bar.dataset.mode = mode;
+    bar.classList.toggle('done', left <= 0);
+    bar.innerHTML = left > 0
+      ? `<div class="rt"><span class="rl">Descanso · ${esc(r.label)}</span><span class="rc num"></span></div><div class="rb"><button data-act="restadj" data-v="-15">−15 s</button><button data-act="restadj" data-v="15">+15 s</button><button data-act="restskip">Saltar</button></div>`
+      : `<div class="rt"><span class="rl">${esc(r.label)}</span><span class="rc">¡A la siguiente serie!</span></div><div class="rb"><button data-act="restskip">Cerrar</button></div>`;
+  }
+  if (left > 0) bar.querySelector('.rc').textContent = fmtSecs(left);
 }
+/* stopwatch inside Entrenar */
+const swMs = sw => sw.acc + (sw.run ? Date.now() - sw.run : 0);
+function tickSw() {
+  const el = $('#swpanel'), sw = S.workout?.sw;
+  if (!el) return;
+  if (!sw) { el.hidden = true; el.dataset.built = ''; return; }
+  if (!el.dataset.built) {
+    el.dataset.built = '1';
+    el.innerHTML = `<span class="swt num"></span><button data-act="swtoggle" class="swgo"></button><button data-act="swreset" aria-label="Reiniciar">↺</button><button data-act="swclose" aria-label="Cerrar cronómetro">✕</button>`;
+  }
+  el.hidden = false;
+  const ms = swMs(sw);
+  el.querySelector('.swt').innerHTML = `${fmtSecs(Math.floor(ms / 1000))}<small>,${Math.floor(ms % 1000 / 100)}</small>`;
+  const go = el.querySelector('.swgo'); const ic = sw.run ? '⏸' : '▶';
+  if (go.textContent !== ic) { go.textContent = ic; go.setAttribute('aria-label', sw.run ? 'Pausar' : 'Iniciar'); go.classList.toggle('on', !!sw.run); }
+}
+setInterval(tickSw, 100);
 setInterval(tickRest, 500);
 async function syncWakeLock() {
   const want = S.tab === 'train' && S.workout && !S.workout.id && restOn(plan?.routines.find(r => r.id === S.workout.routine)) && document.visibilityState === 'visible';
@@ -725,7 +758,7 @@ function viewTrain() {
     }).join('');
   }
   const r = plan.routines.find(x => x.id === w.routine);
-  return `<div class="row between"><div><h2>${esc(r?.name || 'Entreno')}${w.id ? ' · editando' : ''}</h2>${w.startedAt && !w.id ? `<div class="small muted num" id="elapsed">${elapsedText(w.startedAt)}</div>` : ''}${restOn(r) && !w.id ? `<div class="small muted">Descanso automático: ${fmtSecs(r.rest.secs)}</div>` : ''}</div><label class="fld">Fecha<input type="date" id="w-date" data-w="date" value="${esc(w.date)}"></label></div>
+  return `<div class="row between"><div><h2>${esc(r?.name || 'Entreno')}${w.id ? ' · editando' : ''}</h2>${w.startedAt && !w.id ? `<div class="row" style="gap:10px"><span class="small muted num" id="elapsed">${elapsedText(w.startedAt)}</span><button class="ghost swbtn" data-act="swopen">⏱ Cronómetro</button></div>` : ''}${restOn(r) && !w.id ? `<div class="small muted">Descanso automático: ${fmtSecs(r.rest.secs)}</div>` : ''}</div><label class="fld">Fecha<input type="date" id="w-date" data-w="date" value="${esc(w.date)}"></label></div>
     ${w.id ? '' : '<div class="small muted">Los números grises son lo que te toca hoy. Pulsa ✓ para apuntar la serie tal cual, o escribe lo que hiciste. Si dejas el peso vacío se usa el sugerido.</div>'}
     ${w.entries.map((e, ei) => {
       const it = itemFor(e.slot || e.ex), type = exType(e.ex), h = exHistory(e.ex).filter(x => x.sid !== w.id), last = h[h.length - 1], sg = w.id ? null : suggest(e.ex);
@@ -739,7 +772,7 @@ function viewTrain() {
       </section>`;
     }).join('')}
     <textarea id="w-snote" data-w="snote" placeholder="Nota general del entreno" rows="2">${esc(w.note)}</textarea>
-    <div class="savebar"><button data-act="cancelw">${w.id ? 'Cancelar' : 'Descartar'}</button><button class="primary" data-act="savew">Guardar entreno</button></div>`;
+    <div class="savebar"><div id="swpanel" class="swpanel" role="timer" hidden></div><button data-act="cancelw">${w.id ? 'Cancelar' : 'Descartar'}</button><button class="primary" data-act="savew">Guardar entreno</button></div>`;
 }
 
 /* routine editor */
@@ -821,7 +854,7 @@ function render(force) {
   const v = { home: viewHome, train: viewTrain, progress: viewProgress, history: viewHistory, plan: viewPlan }[S.tab];
   main.innerHTML = `<div style="display:flex;flex-direction:column;gap:16px">${banner}${v()}</div>`;
   main.dataset.tab = S.tab;
-  drawCharts(); tickRest(); syncWakeLock();
+  drawCharts(); tickRest(); tickSw(); syncWakeLock();
 }
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawCharts, 150); });
 
@@ -854,6 +887,10 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'restadj': if (W?.rest) { W.rest.end = Math.max(Date.now() + 1000, W.rest.end + +d.v * 1000); W.rest.alerted = false; saveDraft(); tickRest(); } break;
+    case 'swopen': if (W) { W.sw ||= { acc: 0, run: null }; saveDraft(); tickSw(); } break;
+    case 'swtoggle': if (W?.sw) { const sw = W.sw; if (sw.run) { sw.acc += Date.now() - sw.run; sw.run = null; } else sw.run = Date.now(); saveDraft(); tickSw(); } break;
+    case 'swreset': if (W?.sw) { W.sw = { acc: 0, run: null }; saveDraft(); tickSw(); } break;
+    case 'swclose': if (W) { W.sw = null; saveDraft(); tickSw(); } break;
     case 'restskip': if (W) { W.rest = null; saveDraft(); tickRest(); } break;
     case 'addset': { const e = W.entries[+d.e]; const l = e.sets[e.sets.length - 1] || {}; e.sets.push({ kg: l.kg ?? '', r: '', done: false }); saveDraft(); render(true); break; }
     case 'rmset': W.entries[+d.e].sets.pop(); saveDraft(); render(true); break;
