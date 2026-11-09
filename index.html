@@ -19,7 +19,7 @@
 :root {
   --bg: #e9eef0; --surface: #f8fafb; --surface-2: #dfe6e9; --ink: #11181c; --ink-2: #47535a; --muted: #6e7b82;
   --line: #d3dcdf; --accent: #1d5bd0; --accent-ink: #ffffff; --accent-soft: #dbe6fa;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
   --good: #0a7d0a; --good-soft: #dcf1dc; --warn: #8a5a00; --warn-soft: #fbedc9; --bad: #b8322f; --bad-soft: #f8dfde;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --body: "Barlow", "Segoe UI", system-ui, sans-serif;
@@ -27,13 +27,13 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0e1315; --surface: #161c1f; --surface-2: #20282c; --ink: #edf2f4; --ink-2: #b2bdc2; --muted: #85929a;
   --line: #2a3337; --accent: #5d95f2; --accent-ink: #0b1220; --accent-soft: #1b2b47;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --good: #5fd35f; --good-soft: #15301a; --warn: #f2c14e; --warn-soft: #362b10; --bad: #f08482; --bad-soft: #3a1b1b;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0e1315; --surface: #161c1f; --surface-2: #20282c; --ink: #edf2f4; --ink-2: #b2bdc2; --muted: #85929a;
   --line: #2a3337; --accent: #5d95f2; --accent-ink: #0b1220; --accent-soft: #1b2b47;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --good: #5fd35f; --good-soft: #15301a; --warn: #f2c14e; --warn-soft: #362b10; --bad: #f08482; --bad-soft: #3a1b1b;
   color-scheme: dark; }
 
@@ -110,6 +110,18 @@ nav.tabs button[aria-current="page"] { color: var(--accent); background: var(--a
 .picker button { white-space: nowrap; min-height: 34px; padding: 7px 11px; font-weight: 500; }
 .picker button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .picker .grp { align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 2px 0 8px; white-space: nowrap; }
+
+/* calendar */
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.cal .wd { text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .06em; padding-bottom: 2px; }
+.day { aspect-ratio: 1; max-height: 64px; width: 100%; min-height: 0; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 600 16px/1 var(--display); font-variant-numeric: tabular-nums; display: grid; place-items: center; }
+.day.on { border-color: transparent; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.day.today { box-shadow: inset 0 0 0 2px var(--ink); }
+.day.future { opacity: .4; }
+.day.sel { outline: 3px solid var(--ink); outline-offset: 2px; }
+.navm { font-size: 26px; min-width: 44px; padding: 4px 8px; }
+button.linkb { padding: 0; min-height: 0; color: var(--accent); font-size: 13px; }
+.sess .sw, .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 
 /* routine → exercise selector */
 .seg { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 10px; overflow-x: auto; }
@@ -221,12 +233,13 @@ const TABS = [
   ['home', 'Resumen', '<path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/>'],
   ['train', 'Entrenar', '<path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/>'],
   ['progress', 'Progreso', '<path d="M3 20h18"/><path d="M5 16l5-5 4 3 6-7"/>'],
-  ['history', 'Historial', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+  ['history', 'Calendario', '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'],
   ['plan', 'Rutinas', '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'],
 ];
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const TYPES = { weight: 'Con peso', bw: 'Peso corporal', time: 'Tiempo (s)' };
-const SERIES = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
+const SERIES = [1, 2, 3, 4, 5, 6, 7, 8].map(i => `var(--s${i})`);
+const routineColor = id => { const i = (plan?.routines || []).findIndex(r => r.id === id); return SERIES[i] || 'var(--muted)'; };
 
 let mode = 'local';
 // Dentro del APK (Capacitor) hay plugins nativos para compartir la copia y manejar el botón atrás.
@@ -464,7 +477,7 @@ function viewHome() {
   const nWk = ss.filter(s => weekOf(s.date) === wk).length;
   const weeks = [...new Set(ss.map(s => weekOf(s.date)))].sort();
   const rs = plan.routines;
-  const volSeries = rs.slice(0, 3).map((r, i) => ({ name: r.name, color: SERIES[i], vals: weeks.map(w => ss.filter(s => s.routine === r.id && weekOf(s.date) === w).reduce((a, s) => a + sessionVol(s), 0)) }));
+  const volSeries = rs.slice(0, 8).map((r, i) => ({ name: r.name, color: SERIES[i], vals: weeks.map(w => ss.filter(s => s.routine === r.id && weekOf(s.date) === w).reduce((a, s) => a + sessionVol(s), 0)) }));
   const ready = [], groups = rs.map(r => ({ r, rows: r.items.map(it => {
     const h = exHistory(it.ex), last = h[h.length - 1], sg = suggest(it.ex), tr = trend(it.ex);
     if (sg?.kind === 'up') ready.push({ it, sg });
@@ -546,21 +559,62 @@ function viewProgress() {
   return picker + head + charts + table;
 }
 
-function viewHistory() {
-  if (!plan) return emptyStore();
-  const ss = sortedSessions().reverse();
-  if (!ss.length) return '<div class="empty">Aún no hay entrenos. Empieza uno desde Entrenar.</div>';
-  const rn = id => plan.routines.find(r => r.id === id)?.name || 'Entreno';
-  return `<div class="row between"><h2>Historial</h2><span class="small muted">${ss.length} entrenos</span></div>` + ss.map(s => `
-    <section class="card sess">
-      <div class="row between"><div><b>${esc(rn(s.routine))}</b> <span class="muted">· ${fdate(s.date)}${s.dateGuess ? ' (fecha aproximada)' : ''}</span></div><span class="small muted num">${fint(sessionVol(s))} kg</span></div>
+const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const rName = id => plan.routines.find(r => r.id === id)?.name || 'Entreno';
+function sessionCard(s) {
+  return `<section class="card sess">
+      <div class="row between"><div><span class="sw" style="background:${routineColor(s.routine)}"></span><b>${esc(rName(s.routine))}</b> <span class="muted">· ${fdate(s.date)}${s.dateGuess ? ' (fecha aproximada)' : ''}</span></div><span class="small muted num">${fint(sessionVol(s))} kg</span></div>
       <div class="entries">${(s.entries || []).filter(e => e.sets?.length).map(e => `<div><span class="x">${esc(exName(e.ex))}</span><span class="s">${esc(groupSets(e.sets, exType(e.ex)))}</span></div>${e.note ? `<div class="small muted" style="justify-content:flex-end">${esc(e.note)}</div>` : ''}`).join('')}</div>
       ${s.note ? `<div class="small muted">${esc(s.note)}</div>` : ''}
       <div class="row">
         <button class="ghost" data-act="edit" data-id="${esc(s.id)}">Editar</button>
         ${S.confirm === s.id ? `<span class="small">¿Borrar este entreno?</span><button class="danger" data-act="del" data-id="${esc(s.id)}">Sí, borrar</button><button class="ghost" data-act="nodel">Cancelar</button>` : `<button class="ghost danger" data-act="askdel" data-id="${esc(s.id)}">Borrar</button>`}
       </div>
-    </section>`).join('');
+    </section>`;
+}
+function viewHistory() {
+  if (!plan) return emptyStore();
+  const list = S.histV === 'list';
+  return `<div class="seg" role="tablist" aria-label="Vista">
+      <button role="tab" data-act="histv" data-v="cal" aria-selected="${!list}">Calendario</button>
+      <button role="tab" data-act="histv" data-v="list" aria-selected="${list}">Lista</button></div>` + (list ? viewList() : viewCalendar());
+}
+function viewList() {
+  const ss = sortedSessions().reverse();
+  if (!ss.length) return '<div class="empty">Aún no hay entrenos. Empieza uno desde Entrenar.</div>';
+  return `<div class="row between"><h2>Historial</h2><span class="small muted">${ss.length} entrenos</span></div>` + ss.map(sessionCard).join('');
+}
+function viewCalendar() {
+  const now = today().slice(0, 7), month = S.calM || now;
+  const [y, m] = month.split('-').map(Number);
+  const shift = k => new Date(Date.UTC(y, m - 1 + k, 1)).toISOString().slice(0, 7);
+  const first = Date.UTC(y, m - 1, 1), days = new Date(Date.UTC(y, m, 0)).getUTCDate(), lead = (new Date(first).getUTCDay() + 6) % 7;
+  const byDay = {};
+  for (const s of sortedSessions()) if (s.date.startsWith(month)) (byDay[s.date] ||= []).push(s);
+  const inMonth = Object.values(byDay).flat();
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push('<span></span>');
+  for (let d = 1; d <= days; d++) {
+    const date = month + '-' + String(d).padStart(2, '0'), list = byDay[date] || [], cols = list.map(s => routineColor(s.routine));
+    const bg = cols.length === 1 ? cols[0] : cols.length > 1 ? `linear-gradient(135deg, ${cols.map((c, i) => `${c} ${i / cols.length * 100}% ${(i + 1) / cols.length * 100}%`).join(', ')})` : '';
+    const cls = ['day', list.length ? 'on' : '', date === today() ? 'today' : '', date > today() ? 'future' : '', S.calDay === date ? 'sel' : ''].filter(Boolean).join(' ');
+    const label = `${d} de ${MESES_L[m - 1]}: ${list.length ? list.map(s => rName(s.routine)).join(' y ') : 'sin entreno'}`;
+    cells.push(`<button class="${cls}" data-act="calday" data-d="${date}" aria-label="${esc(label)}" aria-pressed="${S.calDay === date}"${bg ? ` style="background:${bg}"` : ''}>${d}</button>`);
+  }
+  const counts = plan.routines.map(r => ({ r, n: inMonth.filter(s => s.routine === r.id).length }));
+  const other = inMonth.filter(s => !plan.routines.some(r => r.id === s.routine)).length;
+  const sel = S.calDay?.startsWith(month) ? S.calDay : null, selList = sel ? byDay[sel] || [] : [];
+  return `<section class="card">
+    <div class="row between">
+      <button class="ghost navm" data-act="calm" data-m="${shift(-1)}" aria-label="Mes anterior">‹</button>
+      <h2>${MESES_L[m - 1]} ${y}</h2>
+      <button class="ghost navm" data-act="calm" data-m="${shift(1)}" aria-label="Mes siguiente" ${month >= now ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="cal">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(w => `<span class="wd">${w}</span>`).join('')}${cells.join('')}</div>
+    <div class="legend">${counts.map(({ r, n }) => `<span><span class="sw" style="background:${routineColor(r.id)}"></span>${esc(r.name)} <b class="num">${n}</b></span>`).join('')}${other ? `<span><span class="sw" style="background:var(--muted)"></span>Otras <b class="num">${other}</b></span>` : ''}</div>
+    <div class="small muted">${inMonth.length} ${inMonth.length === 1 ? 'entreno' : 'entrenos'} en ${MESES_L[m - 1]}${month !== now ? ` · <button class="ghost linkb" data-act="calm" data-m="${now}">Volver a este mes</button>` : ''}</div>
+  </section>
+  ${sel ? (selList.length ? selList.map(sessionCard).join('') : `<div class="empty">El ${fdate(sel)} no entrenaste.</div>`) : '<div class="small muted" style="text-align:center">Toca un día para ver el entreno.</div>'}`;
 }
 
 /* workout */
@@ -776,6 +830,9 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'hidebk': lsSet('sobrecarga-backup-hide', Date.now()); render(true); toast('Aviso oculto por 30 días'); break;
+    case 'histv': S.histV = d.v; S.confirm = null; render(true); break;
+    case 'calm': S.calM = d.m; S.calDay = null; S.confirm = null; render(true); break;
+    case 'calday': S.calDay = S.calDay === d.d ? null : d.d; S.confirm = null; render(true); break;
     case 'askdel': S.confirm = d.id; render(true); break;
     case 'nodel': S.confirm = null; render(true); break;
     case 'del': try { await removeSession(d.id); S.confirm = null; render(true); toast('Entreno borrado'); } catch (e) { toast(errMsg(e)); } break;
